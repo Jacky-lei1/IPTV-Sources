@@ -6,9 +6,9 @@ import sys
 import json
 import logging
 import argparse
-from src.collector import IPTVSourceCollector
-from src.checker import IPTVSourceChecker
-from src.merger import IPTVSourceMerger
+from collector import IPTVSourceCollector
+from checker import IPTVSourceChecker
+from merger import IPTVSourceMerger
 
 # 配置日志
 logging.basicConfig(
@@ -23,7 +23,7 @@ logger = logging.getLogger("IPTV-Main")
 
 def load_config():
     """加载配置文件"""
-    config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.json")
+    config_path = os.path.join(os.path.dirname(__file__), "..", "config.json")
     
     try:
         with open(config_path, 'r', encoding='utf-8') as f:
