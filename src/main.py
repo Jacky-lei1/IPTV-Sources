@@ -24,11 +24,13 @@ logger = logging.getLogger("IPTV-Main")
 
 def load_config():
     """加载配置文件"""
-    config_path = os.path.join(os.path.dirname(__file__), "config.json")
+    # 向上一级目录查找配置文件
+    config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.json")
     
     try:
         with open(config_path, 'r', encoding='utf-8') as f:
             config = json.load(f)
+        logger.info(f"成功从 {config_path} 加载配置")
         return config
     except Exception as e:
         logger.error(f"加载配置文件失败: {str(e)}")
