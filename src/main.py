@@ -7,9 +7,9 @@ import json
 import logging
 import time
 import argparse
-from collector import IPTVSourceCollector
-from checker import IPTVSourceChecker
-from merger import IPTVSourceMerger
+from src.collector import IPTVSourceCollector
+from src.checker import IPTVSourceChecker
+from src.merger import IPTVSourceMerger
 
 # 配置日志
 logging.basicConfig(
