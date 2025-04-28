@@ -5,6 +5,7 @@ import os
 import sys
 import json
 import logging
+import time
 import argparse
 from collector import IPTVSourceCollector
 from checker import IPTVSourceChecker
@@ -23,7 +24,7 @@ logger = logging.getLogger("IPTV-Main")
 
 def load_config():
     """加载配置文件"""
-    config_path = os.path.join(os.path.dirname(__file__), "..", "config.json")
+    config_path = os.path.join(os.path.dirname(__file__), "config.json")
     
     try:
         with open(config_path, 'r', encoding='utf-8') as f:
@@ -35,13 +36,20 @@ def load_config():
 
 def parse_m3u_file(filepath):
     """解析M3U文件，提取频道信息和URL"""
-    with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
-        content = f.read()
+    logger.info(f"解析M3U文件: {filepath}")
+    
+    try:
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            content = f.read()
+    except Exception as e:
+        logger.error(f"读取文件失败: {filepath}, 错误: {str(e)}")
+        return {}
     
     channels = {}
     
     lines = content.strip().split('\n')
     if not lines or not lines[0].startswith('#EXTM3U'):
+        logger.warning(f"不是有效的M3U文件: {filepath}")
         return channels
     
     i = 1
@@ -83,6 +91,7 @@ def parse_m3u_file(filepath):
         else:
             i += 1
     
+    logger.info(f"从文件 {filepath} 解析出 {len(channels)} 个频道")
     return channels
 
 def parse_extinf(extinf_line):
@@ -113,15 +122,21 @@ def main():
     """主函数"""
     parser = argparse.ArgumentParser(description='IPTV直播源收集、检测与合并工具')
     parser.add_argument('--no-check', action='store_true', help='跳过直播源检测步骤')
+    parser.add_argument('--max-channels', type=int, default=0, help='最大处理频道数量(用于测试)')
     args = parser.parse_args()
+    
+    start_time = time.time()
+    logger.info("开始IPTV直播源更新流程")
     
     try:
         # 加载配置
         config = load_config()
+        logger.info(f"配置加载完成，共 {len(config['sources'])} 个直播源")
         
         # 收集直播源
         collector = IPTVSourceCollector(config)
         source_files = collector.collect()
+        logger.info(f"直播源收集完成，共 {len(source_files)} 个文件")
         
         # 解析所有源文件
         all_channels = {}
@@ -134,6 +149,15 @@ def main():
                     all_channels[channel_id][1].extend(urls)
                 else:
                     all_channels[channel_id] = [info, urls]
+                    
+            # 如果设置了最大频道数限制，用于测试
+            if args.max_channels > 0 and len(all_channels) >= args.max_channels:
+                logger.info(f"达到最大频道数限制 ({args.max_channels})，停止收集")
+                break
+        
+        # 去重URL
+        for channel_id, (info, urls) in all_channels.items():
+            all_channels[channel_id][1] = list(set(urls))
         
         logger.info(f"共解析出 {len(all_channels)} 个频道, {sum(len(urls) for _, urls in all_channels.values())} 个直播源")
         
@@ -143,6 +167,7 @@ def main():
             check_results = checker.check(all_channels)
         else:
             # 跳过检查，构造检查结果
+            logger.info("跳过直播源检测步骤")
             check_results = {}
             for channel_id, (info, urls) in all_channels.items():
                 check_results[channel_id] = {
@@ -154,7 +179,9 @@ def main():
         merger = IPTVSourceMerger(config)
         output_path = merger.merge(check_results)
         
-        logger.info("IPTV直播源更新完成")
+        end_time = time.time()
+        logger.info(f"IPTV直播源更新完成，总耗时: {end_time - start_time:.2f}秒")
+        logger.info(f"输出文件: {output_path}")
         
     except Exception as e:
         logger.error(f"程序运行出错: {str(e)}", exc_info=True)
