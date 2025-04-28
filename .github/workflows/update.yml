@@ -1,8 +1,7 @@
 name: Update IPTV Sources
-
 on:
   schedule:
-    - cron: '0 */6 * * *'  # 每6小时运行一次
+    - cron: '0 */6 * * *'  # 每6小时运行一次（修复了表达式）
   workflow_dispatch:  # 允许手动触发
   push:
     branches: [ main ]
@@ -10,7 +9,6 @@ on:
       - 'src/**'
       - 'config.json'
       - '.github/workflows/update.yml'
-
 jobs:
   update:
     runs-on: ubuntu-latest
@@ -20,6 +18,8 @@ jobs:
     steps:
     - name: 检出代码
       uses: actions/checkout@v2
+      with:
+        fetch-depth: 0  # 获取完整历史
       
     - name: 设置Python环境
       uses: actions/setup-python@v2
@@ -47,8 +47,10 @@ jobs:
         git add data/output/
         git diff --quiet && git diff --staged --quiet || git commit -m "自动更新IPTV直播源 $(date +'%Y-%m-%d %H:%M:%S')"
         
+    - name: 拉取最新更改
+      run: |
+        git pull --no-rebase origin main
+        
     - name: 推送更新
-      uses: ad-m/github-push-action@master
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        branch: main
+      run: |
+        git push origin main
