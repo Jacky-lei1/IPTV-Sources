@@ -13,7 +13,7 @@ logger = logging.getLogger("IPTV-Collector")
 class IPTVSourceCollector:
     def __init__(self, config):
         self.config = config
-        self.sources_dir = os.path.join(os.path.dirname(__file__), "data", "sources")
+        self.sources_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "sources")
         os.makedirs(self.sources_dir, exist_ok=True)
         
     def collect(self):
