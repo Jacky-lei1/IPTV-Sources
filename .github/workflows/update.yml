@@ -38,8 +38,7 @@ jobs:
         
     - name: 运行更新脚本
       run: |
-        cd src
-        python main.py
+        python src/main.py
         
     - name: 提交更新
       run: |
