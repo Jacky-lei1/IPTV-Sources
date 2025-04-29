@@ -9,13 +9,14 @@ import time
 import argparse
 from collector import IPTVSourceCollector
 from checker import IPTVSourceChecker
+from merger import IPTVSourceMerger
 
 # 配置日志
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("iptv_collector.log"),
+        logging.FileHandler("iptv_update.log"),
         logging.StreamHandler()
     ]
 )
@@ -120,13 +121,13 @@ def parse_extinf(extinf_line):
 
 def main():
     """主函数"""
-    parser = argparse.ArgumentParser(description='IPTV直播源收集和检测工具')
+    parser = argparse.ArgumentParser(description='IPTV直播源收集、检测与合并工具')
     parser.add_argument('--no-check', action='store_true', help='跳过直播源检测步骤')
     parser.add_argument('--max-channels', type=int, default=0, help='最大处理频道数量(用于测试)')
     args = parser.parse_args()
     
     start_time = time.time()
-    logger.info("开始IPTV直播源收集和检测流程")
+    logger.info("开始IPTV直播源更新流程")
     
     try:
         # 加载配置
@@ -170,8 +171,8 @@ def main():
             checker = IPTVSourceChecker(config)
             check_results = checker.check(all_channels)
             
-            # 保存结果为JSON文件
-            output_path = os.path.join(output_dir, config["output_file"])
+            # 新增: 保存结果为JSON文件
+            json_output_path = os.path.join(output_dir, "collected_sources.json")
             
             # 转换结果为可序列化的格式
             serializable_results = {}
@@ -184,9 +185,15 @@ def main():
                     ]
                 }
             
-            with open(output_path, 'w', encoding='utf-8') as f:
+            with open(json_output_path, 'w', encoding='utf-8') as f:
                 json.dump(serializable_results, f, ensure_ascii=False, indent=2)
                 
+            logger.info(f"JSON格式检测结果已保存到: {json_output_path}")
+            
+            # 合并直播源
+            merger = IPTVSourceMerger(config)
+            output_path = merger.merge(check_results)
+            
             logger.info(f"检测结果已保存到: {output_path}")
         else:
             logger.info("跳过直播源检测步骤")
