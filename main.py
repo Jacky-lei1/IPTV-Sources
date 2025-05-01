@@ -287,8 +287,29 @@ def normalize_channel_name(name, config):
                 
     return name
 
+def should_exclude_channel(info, url, config):
+    """检查是否应该排除某个频道或源"""
+    # 检查URL是否包含被排除的源
+    if "excluded_sources" in config:
+        for excluded_source in config["excluded_sources"]:
+            if excluded_source in url:
+                return True
+    
+    # 检查频道ID是否为数字
+    # 有些源使用纯数字作为频道ID，可能会导致乱码或其他问题
+    tvg_id = info.get('tvg-id', '')
+    if tvg_id and tvg_id.isdigit() and len(tvg_id) < 5:  # 排除类似"4"这样的频道ID
+        return True
+        
+    # 检查组标题是否包含乱码
+    group_title = info.get('group-title', '')
+    if any(char in group_title for char in ['å', 'é¢', 'è§', 'é', '¢', '§', 'è', 'æ', 'ç', '¾', 'â']):
+        return True
+    
+    return False
+
 def organize_channels(sources_data, config):
-    """整理频道，去除重复，选择最佳源"""
+    """整理频道，去除重复，为每个频道保留最多两个源"""
     logger.info("开始整理频道...")
     
     # 按频道名称分组
@@ -303,10 +324,10 @@ def organize_channels(sources_data, config):
         if not title:
             continue
             
-        # 收集有效源
+        # 收集有效源，并排除不需要的源
         valid_sources = []
         for source in data["sources"]:
-            if source["valid"]:
+            if source["valid"] and not should_exclude_channel(info, source["url"], config):
                 valid_sources.append((source["url"], source["latency"]))
         
         # 如果没有有效源，跳过此频道
@@ -316,24 +337,26 @@ def organize_channels(sources_data, config):
         # 按延迟排序
         valid_sources.sort(key=lambda x: x[1])
         
-        # 只保留最佳源
-        best_source = valid_sources[0][0]
-        best_latency = valid_sources[0][1]
+        # 保留最多两个源（速度最快和第二快的）
+        best_sources = valid_sources[:min(2, len(valid_sources))]
         
         # 将频道添加到按名称分组的集合中
         if title in channels_by_name:
-            # 如果已存在相同名称的频道，比较延迟选择最佳的
-            if best_latency < channels_by_name[title]["latency"]:
+            existing_sources = channels_by_name[title]["sources"]
+            existing_latency = channels_by_name[title]["latency"]
+            
+            # 如果现有的延迟更高（更慢），则替换为新的源
+            if best_sources[0][1] < existing_latency:
                 channels_by_name[title] = {
                     "info": info,
-                    "source": best_source,
-                    "latency": best_latency
+                    "sources": [source[0] for source in best_sources],
+                    "latency": best_sources[0][1]
                 }
         else:
             channels_by_name[title] = {
                 "info": info,
-                "source": best_source,
-                "latency": best_latency
+                "sources": [source[0] for source in best_sources],
+                "latency": best_sources[0][1]
             }
     
     logger.info(f"频道整理完成，共 {len(channels_by_name)} 个唯一频道")
@@ -354,7 +377,7 @@ def sort_channels_by_category(channels, config):
     return sorted(channels.items(), key=get_category_order)
 
 def generate_m3u(sorted_channels, output_path):
-    """生成M3U文件"""
+    """生成M3U文件，包含主源和备用源"""
     logger.info(f"开始生成M3U文件: {output_path}")
     
     with open(output_path, 'w', encoding='utf-8') as f:
@@ -364,12 +387,18 @@ def generate_m3u(sorted_channels, output_path):
         # 写入频道信息
         for channel_name, data in sorted_channels:
             info = data["info"]
-            source = data["source"]
+            sources = data["sources"]
             
             # 构建EXTINF行
             extinf = build_extinf(info)
             f.write(f"{extinf}\n")
-            f.write(f"{source}\n")
+            
+            # 写入主源
+            f.write(f"{sources[0]}\n")
+            
+            # 如果有备用源，添加备用源标记和URL
+            if len(sources) > 1:
+                f.write(f"#EXTBURL:{sources[1]}\n")
     
     logger.info(f"M3U文件生成完成: {output_path}, 共 {len(sorted_channels)} 个频道")
     return output_path
