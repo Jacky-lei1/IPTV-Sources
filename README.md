@@ -17,7 +17,6 @@
 您可以直接使用以下地址作为您的 IPTV 播放源：
 
 - [https://raw.githubusercontent.com/cs3306/IPTV-Sources/main/data/output/iptv_collection.m3u](https://raw.githubusercontent.com/cs3306/IPTV-Sources/main/data/output/iptv_collection.m3u)  
-  **（注意：此源包含成人频道）**
 
 ## 播放器支持
 
